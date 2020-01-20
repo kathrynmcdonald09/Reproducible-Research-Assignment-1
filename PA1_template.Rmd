@@ -1,0 +1,192 @@
+---
+title: "PA1_template.Rmd"
+output: html_document
+---
+To begin this project, I need to configure my working directory and download the dataset.
+
+```{r}
+setwd("C:/Users/Kathrynmcdonald/Desktop/Desktop Working Directory")
+path<-getwd()
+download.file(url="https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",
+              destfile=paste(path, "repdata_data_activity", sep = "/"))
+unzip(zipfile = "repdata_data_activity")
+```
+
+Now we can read in the data, and get a sense of what the dataset contains. 
+
+The dataset contains three variables:
+1.date
+2.steps
+3.intervals
+
+
+
+```{r}
+activity<- read.csv("activity.csv", sep = ",")
+
+head(activity)
+names(activity)
+str(activity)
+```
+
+I've chosen to reformat the date data.
+```{r}
+activity$date<-as.Date(activity$date, "%Y-%m-%d")
+```
+
+##WHAT IS MEAN TOTAL NUMBER OF STEPS TAKEN PER DAY?
+
+###Question1: Calculate the total number of steps taken per day
+```{r}
+totalsteps<-aggregate(steps ~ date, activity, sum, na.rm=FALSE)
+totalsteps
+```
+
+
+###Question2: If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day.
+
+I've decided to explore the difference between a barplot and a histogram using ggplot.
+
+###BARPLOT
+```{r}
+library(ggplot2)
+
+png("plot1A.png")
+ggplot(totalsteps,aes(y=totalsteps$steps,x=totalsteps$date))+
+  geom_bar(stat="identity") + 
+  ylab("Total Steps")+xlab("Date")+
+  ggtitle("Barplot of Total Steps by date")
+dev.off()
+```
+
+###Histogram
+```{r}
+nrow(totalsteps)
+
+png("plot1B.png")
+ggplot(totalsteps,aes(x=steps))+
+  geom_histogram(binwidth=1000) + 
+  ylab("Freqyency")+xlab("Steps")+
+  ggtitle("Histogram of Total Daily Steps")
+dev.off()
+```
+
+###Question3:Calculate and report the mean and median of the total number of steps taken per day
+
+```{r}
+summary(totalsteps)
+totalsteps<-aggregate(steps ~ date, activity, sum)
+meantotalsteps<-mean(totalsteps$steps, na.rm=FALSE)
+mediantotalsteps<-median(totalsteps$steps, na.rm=FALSE)
+meantotalsteps
+mediantotalsteps
+```
+The mean is 10766.19, and the median is 10765.
+
+##WHAT IS THE AVERAGE DAILY ACTIVITY PATTERN?
+
+###Question1: Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+```{r}
+head(activity)
+str(activity)
+averageinterval<-aggregate(steps~interval, activity, mean, na.rm=TRUE)
+
+png("plot2A.png")
+ggplot(averageinterval, aes(x=interval, y=steps))+
+  geom_line(size=1)+
+  ylab("Steps Per Day")+
+  xlab("Interval")
+  ggtitle("Average Daily Steps")
+dev.off()
+```
+
+###Question2: Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+summary(averageinterval)
+maxinterval<-averageinterval[which.max(averageinterval$steps), 1]
+maxinterval
+```
+Max steps is 206.170. This occurs at the interval 835.
+
+##INPUT MISSING VALUES
+
+###Question1: Calculate and report the total number of missing values in the dataset.
+```{r}
+activity2<-activity
+sum(is.na(activity2))
+```
+There are 2304 incomplete values in the dataset. I'd like to explore where these missing values live.
+
+```{r}
+sum(is.na(activity2$steps))
+sum(is.na(activity2$date))
+sum(is.na(activity2$interval))
+```
+So, we've determined a few things:
+1.There are 2304 incomplete values for the variable steps. 
+2.There are 0 incomplete values for the variable date. 
+3.There are 0 incomplete values for the variable interval. 
+
+###Question2:Devise a strategy for filling in all of the missing values in the dataset.
+
+I'm going to substitute all missing values with the column mean. Since the only variable with missing data is steps, 
+I will focus on replacing these missing values with the mean of steps.
+
+###Question3: Create a new dataset that is equal to the original dataset but with missing data filled in.
+```{r}
+activity2$steps[is.na(activity2$steps)]<-mean(activity2$steps, na.rm = TRUE)
+sum(is.na(activity2))
+sum(!is.na(activity2))
+```
+Now there are no missing values.
+I've also double checked using the reverse operation and all values are complete.
+
+###Question4: Make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates at the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r}
+activity2$date<-as.Date(activity2$date, "%Y-%m-%d")
+totalsteps<-aggregate(steps ~ date, activity, sum)
+
+
+png("plot4.png")
+ggplot(totalsteps,aes(x=steps))+
+  geom_histogram(binwidth=1000) + 
+  ylab("Freqyency")+xlab("Steps")+
+  ggtitle("Histogram of Total Daily Steps (Imputed Data")
+dev.off()
+
+mean_Imputed<-mean(totalsteps$steps, na.rm=TRUE)
+median_Imputed<-median(totalsteps$steps, na.rm=TRUE)
+meantotalsteps #10766.19
+mediantotalsteps #10765
+```
+The mean is 10766.19. 
+The median is 10765. 
+
+Both the mean and median remain the same as prior to imputation. The shape of the histogram (plot 4) 
+has changed slightly, indicating that the frequency of steps per day has been impacted by imputation.
+
+
+##ARE THERE DIFFERENCES IN ACTIVITY PATTERNS BETWEEN WEEKDAYS AND WEEKENDS?
+
+###Question1: Create a new factor variable in teh dataset with two levels: weekday and weekend
+```{r}
+activity2$Date1<-as.Date(activity2$date,format = "%Y-%m-%d")
+activity2$weekday<-weekdays(activity2$Date1)
+activity2$kindofday<-ifelse(activity2$weekday=="Saturday" | activity2$weekday=="Sunday", "weekend", "weekday")
+```
+
+###Question2: Make a panel plot containing a time series plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days.
+```{r]}
+Stepstaken <- aggregate(steps~interval+kindofday,data=activity2,FUN=mean,na.action=na.omit)
+
+png("plot5c.png")
+ggplot(Stepstaken, aes(x=interval, y=steps))+
+  geom_line()+
+  ggtitle("Mean steps per interval for Weekdays vs. Weekends")+
+  xlab("Time")+
+  ylab("Steps")+
+  theme()+
+  facet_grid(kindofday ~ .)
+dev.off()
+```
